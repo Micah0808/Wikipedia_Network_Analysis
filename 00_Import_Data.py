@@ -64,13 +64,6 @@ if __name__ == '__main__':
     # 3  Robert_Abbott_(politi...                        []     [1830, oct, 31]
     # 4            Abd%C3%BClaziz  [%C5%9Eehzade_Yusuf_I...  [1830, None, None]
 
-    # # The names appear to have strange values in them like %C3% etc. Let's
-    # # check if this is due to how pandas has parsed the df or if this is
-    # # inherent in the json file?
-    # with open(data_path) as f:
-    #     json_data = json.loads(f.read())  # Also exists in the json file.
-    # # I will deal with this later
-
     print(raw_df.columns)
     # Index(['name', 'links', 'dob'], dtype='object')
 
@@ -86,8 +79,7 @@ if __name__ == '__main__':
 
     # How many observations are missing links to others in the df?
     print(raw_df.loc[raw_df['links'].str.len() == 0].shape)  # 528340
-    # Let's drop these from the analysis.
-    raw_df = raw_df.loc[raw_df['links'].str.len() != 0]
+    raw_df = raw_df.loc[raw_df['links'].str.len() != 0]  # Let's drop these
     print(raw_df.shape)  # 731070 remaining
     print(raw_df.head())
     #                       name                     links                 dob
@@ -100,6 +92,7 @@ if __name__ == '__main__':
     # Creating a data frame of each list element in dob to inspect for NaNs
     # None values. This will give me a better idea of what we have to work
     # with.
+    # UPDATE THIS CODE LIKE BELOW
     date_df = (pd.DataFrame(raw_df['dob']
                             .astype(str)
                             .str.split()
@@ -119,11 +112,13 @@ if __name__ == '__main__':
     print(date_df['Year'].isna().sum())  # 0 missing values
     print(date_df['Month'].value_counts()[0])  # 381705
     print(date_df['Day'].value_counts()[0])  # 381705
+
     # Same amount of missing values between Months and day. Is this coincidental
     # or does missing in one column mean that the other will also be missing?
     print(date_df.loc[date_df['Month'].str.contains('None')
                       & date_df['Day'].str.contains('None')]
           .shape)  # 381705
+
     # Yes, this is true. If a value is None in either Month or Day
     # it is also None in the other.
 
@@ -138,13 +133,37 @@ if __name__ == '__main__':
         .add_prefix('Link_')  # Adding a prefix to each column name
         .fillna(value=np.nan)  # Replacing None values with NaNs
     )
+    print(wide_link_df)
 
+    # Inserting Name and ID columns to parse the dataframe from wide to long
+    # format
     wide_link_df.insert(loc=0, column='Name', value=raw_df['name'])
     wide_link_df.insert(loc=0, column='ID', value=wide_link_df.index)
 
-    # Converting from a wide dataframe to a long dataframe
-    head_df = wide_link_df.head()
-    print(pd.wide_to_long(wide_link_df, stubnames='Link_', i='ID', j='Name'))
+    # Converting from a wide to long dataframe
+    long_parsed_df = (
+        pd.wide_to_long(wide_link_df, stubnames='Link_', i='ID', j='Name')
+        .query('Link_.notna()')
+        .rename(columns={'Name': 'Source', 'Link_': 'Target'})
+        .reset_index(drop=True)
+    )
+    print(long_parsed_df.shape)
+    print(long_parsed_df.head(10))
+
+    #                      Source                    Target
+    # 0       Andreas_Leigh_Aabel          'Anders_Krogvig'
+    # 1   Benjamin_Vaughan_Abbott           'Austin_Abbott'
+    # 2          Burroughs_Abbott           'James_H._Kyle'
+    # 3            Abd%C3%BClaziz  '%C5%9Eehzade_Yusuf_I...
+    # 4             Santos_Acosta    'Joaqu%C3%ADn_Riascos'
+    # 5          John_Adams-Acton  'Anthony_Ashley-Coope...
+    # 6          John_Hicks_Adams       'Benjamin_Mayfield'
+    # 7  Walter_Adams_(Austral...      'George_Joseph_Hall'
+    # 8               Aga_Khan_II            'Aga_Khan_III'
+    # 9          Karin_%C3%85hlin     'Anna_Sandstr%C3%B6m'
+
+    long_parsed_df.to_csv('long_parsed_df.csv')
+    long_parsed_df.to_pickle('long_parsed_df.pkl')
 
     # =========================================================================
     # Testing out a NetworkX object
