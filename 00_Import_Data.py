@@ -171,7 +171,7 @@ if __name__ == '__main__':
     # Converting from a wide to long dataframe
     long_parsed_df = (
         pd.wide_to_long(wide_link_df, stubnames='Link_', i='ID', j='Name')
-        .query('Link_.notna() | Year.notna()')  # Dropping NaNs
+        .query('Link_.notna()')  # Dropping NaNs
         .rename(columns={'Name': 'Source', 'Link_': 'Target'})
         .reset_index(drop=True)
     )
@@ -197,41 +197,44 @@ if __name__ == '__main__':
     # Testing out a NetworkX object
     # =========================================================================
     # Reading in, inspecting, and plotting the graph
+    pandas_config()
     parsed_df = pd.read_pickle('long_parsed_df_with_meta_data.pkl')
-    parsed_df = parsed_df.query('Year.notna()')
-    print(parsed_df.shape)  # (2658928, 4)
+    parsed_df = parsed_df.drop(['Datetime', 'Year'], axis=1)
+    parsed_df['Target'] = parsed_df['Target'].str.strip("'")
+    print(parsed_df.head())
 
-    wiki_graph = nx.from_pandas_edgelist(df=parsed_df,
+    print(parsed_df.columns)
+    print(parsed_df.shape)  # (4353922, 2)
+    print(parsed_df.dtypes)
+    # Source    object
+    # Target    object
+
+    # Creating a networkx graph
+    sub = parsed_df.sample(1000, random_state=10)
+    wiki_graph = nx.from_pandas_edgelist(df=sub,
                                          source='Source',
                                          target='Target',
-                                         edge_attr='Year',
                                          create_using=nx.Graph())
     print(type(wiki_graph))
-    print(wiki_graph.nodes())
+    print(wiki_graph.nodes(data=True))
     print(wiki_graph.edges())
     print(nx.info(wiki_graph))
     nx.draw(wiki_graph)
 
     # Type: Graph
-    # Number of nodes: 950115
-    # Number of edges: 2658928
-    # Average degree:   5.5971
+    # Number of nodes: 841055
+    # Number of edges: 3695365
+    # Average degree:   8.7875
 
-    # ======================================================================
-    # Visualising
-    # ======================================================================
-    # # Create rationale plots
-    # In an undirected graph, the matrix is symmetrical around the diagonal
-    # as in this plot. Therefore, the data is read in correctly.
-    # m = nv.MatrixPlot(wiki_graph)
-    # m.draw()
-    # plt.show()
-    # c = nv.CircosPlot(wiki_graph)
-    # c.draw()
-    # plt.show()
-    # a = nv.ArcPlot(wiki_graph)
-    # a.draw()
-    # plt.show()
+    # # Is there a relationship between year and degree
+    # degrees = [len(list(wiki_graph.neighbors(n))) for n in wiki_graph.nodes()]
+    # print(len(degrees))
+    #
+    # corr_df = parsed_df.assign(Degree=degrees)
+    #
+    # print(parsed_df.groupby('Source').count().shape)
+    # print(parsed_df.loc[parsed_df['Source'].duplicated(keep='first') == False].shape)
+
 
     # ======================================================================
     # Testing a model
@@ -239,31 +242,83 @@ if __name__ == '__main__':
     from networkx.algorithms.community.centrality import girvan_newman
     import itertools
 
-    G = nx.path_graph(10)
-    print(G.nodes())  # NodeView((0, 1, 2, 3, 4, 5, 6, 7, 8, 9))
-    print(G.edges())
-    # EdgeView([(0, 1), (1, 2), (2, 3), (3, 4), (4, 5),
-    # (5, 6), (6, 7), (7, 8), (8, 9)])
+    # G = nx.path_graph(10)
 
-    # Model
-    # To get the first pair of communities:
-    comp = girvan_newman(wiki_graph)
-    print(tuple(sorted(c) for c in next(comp)))
+    # # Creating a networkx graph
+    # subsample = parsed_df.sample(n=10000, random_state=10)
+    # # subsample = subsample['Source'].str.strip('"')
+    #
+    # subsample['Source_Int'] = pd.factorize(subsample['Source'])[0]
+    # subsample['Source'].value_counts()
+    # subsample['Source_Int'].value_counts()
+    #
+    # subsample['Target_Int'] = pd.factorize(subsample['Target'])[0]
+    # subsample['Target'].value_counts()
+    # subsample['Target_Int'].value_counts()
+    #
+    # subsample = subsample[['Source_Int', 'Target_Int']]
+    # print(subsample.dtypes)
+    # print(subsample)
+    # print(subsample.shape)
+    #
+    # G = nx.from_pandas_edgelist(df=subsample,
+    #                             source='Source_Int',
+    #                             target='Target_Int',
+    #                             create_using=nx.Graph())
+    # print(nx.info(G))
+    # Number of nodes: 9748
+    # Number of edges: 10000
+    # Average degree:   2.0517
 
-    # To get only the first k tuples of communities, use itertools.islice():
-    k = 10
-    comp = girvan_newman(wiki_graph)
-    for communities in itertools.islice(comp, k):
-        print(tuple(sorted(c) for c in communities))
+    from node2vec import Node2Vec
+    # Generate walks
+    node2vec = Node2Vec(wiki_graph, dimensions=2, walk_length=20, num_walks=10, workers=4)
+    model = node2vec.fit(window=10, min_count=1)  # Learn embeddings
+    # Save the embedding in file embedding.emb
+    model.wv.save_word2vec_format("embedding.emb")
 
-    # To stop getting tuples of communities once the number of communities is
-    # greater than k, use itertools.takewhile():
-    G = nx.path_graph(8)
-    k = 500
-    comp = girvan_newman(wiki_graph)
-    limited = itertools.takewhile(lambda c: len(c) <= k, comp)
-    for communities in limited:
-        print(tuple(sorted(c) for c in communities))
+    # Clustering model
+    X = np.loadtxt("embedding.emb", dtype=str, skiprows=1)
+    print(pd.DataFrame(X))
+    X = X[X[:, 0].argsort()];
+    print(X)
+    print(pd.DataFrame(X))
+
+    # Remove the node index from X and save in Z
+    Z = X[0:X.shape[0], 1:X.shape[1]];
+    print(pd.DataFrame(Z))
+
+    from sklearn.cluster import AgglomerativeClustering
+    clust = AgglomerativeClustering(n_clusters=2).fit(Z)
+    labels = clust.labels_  # get the cluster labels of the nodes.
+    print(len(labels))
+    print(labels)
+    print(pd.Series(labels).value_counts())
+
+    from sklearn.metrics import silhouette_score
+    print(silhouette_score(pd.DataFrame(X)[0].factorize()[0].reshape(-1, 1),
+                           labels))
+
+
+
+
+
+
+
+
+
+
+
+
+
+    # # To stop getting tuples of communities once the number of communities is
+    # # greater than k, use itertools.takewhile():
+    # G = nx.path_graph(8)
+    # k = 500
+    # comp = girvan_newman(wiki_graph)
+    # limited = itertools.takewhile(lambda c: len(c) <= k, comp)
+    # for communities in limited:
+    #     print(tuple(sorted(c) for c in communities))
 
     # ======================================================================
     # Degree centrality
@@ -351,202 +406,7 @@ if __name__ == '__main__':
     plt.scatter(list(bet_cen.values()), list(deg_cen.values()))
     plt.show()
 
-    # Find the nodes that can broadcast messages very efficiently to lots of
-    # people one degree of separation away.
-    # Define find_nodes_with_highest_deg_cent()
-    def find_nodes_with_highest_deg_cent(G):
-        # Compute the degree centrality of G: deg_cent
-        deg_cent = nx.degree_centrality(G)
-        # Compute the maximum degree centrality: max_dc
-        max_dc = max(list(deg_cent.values()))
-        nodes = set()
-        # Iterate over the degree centrality dictionary
-        for k, v in deg_cent.items():
-            # Check if the current value has the maximum degree centrality
-            if v == max_dc:
-                # Add the current node to the set of nodes
-                nodes.add(k)
-        return nodes
 
-    # Find the node(s) that has the highest degree centrality in T: top_dc
-    top_dc = find_nodes_with_highest_deg_cent(wiki_graph)
-    print(top_dc)
-    # Write the assertion statement
-    for node in top_dc:
-        assert (nx.degree_centrality(
-            wiki_graph)[node] == max(nx.degree_centrality(wiki_graph)
-                                     .values())
-                )
-
-    # Now for betweeness centrality
-    # Define find_node_with_highest_bet_cent()
-    def find_node_with_highest_bet_cent(G):
-        # Compute betweenness centrality: bet_cent
-        bet_cent = nx.betweenness_centrality(G)
-        # Compute maximum betweenness centrality: max_bc
-        max_bc = max(list(bet_cent.values()))
-        nodes = set()
-        # Iterate over the betweenness centrality dictionary
-        for k, v in bet_cent.items():
-            # Check if the current value has the maximum betweenness
-            # centrality
-            if v == max_bc:
-                # Add the current node to the set of nodes
-                nodes.add(k)
-        return nodes
-
-    # Use that function to find the node(s) that has the highest betweenness
-    # centrality in the network: top_bc
-    top_bc = find_node_with_highest_bet_cent(wiki_graph)
-    print(top_bc)
-
-    # Write an assertion statement that checks that the node(s) is/are
-    # correctly identified.
-    for node in top_bc:
-        assert nx.betweenness_centrality(wiki_graph)[node] == max(
-            nx.betweenness_centrality(wiki_graph).values()
-        )
-
-    # ======================================================================
-    # Cliques
-    # ======================================================================
-    # Identifying triangle relationships (the simplest complex clique)
-    from itertools import combinations
-
-    # Write a function that identifies all nodes in a triangle relationship
-    # with a given node.
-    def nodes_in_triangle(G, n):
-        """
-        Returns the nodes in a graph `G` that are involved in a triangle
-        relationship with the node `n`.
-        """
-        triangle_nodes = set([n])
-        # Iterate over all possible triangle relationship combinations
-        for n1, n2 in combinations(G.neighbors(n), 2):
-            # Check if n1 and n2 have an edge between them
-            if G.has_edge(n1, n2):
-                # Add n1 to triangle_nodes
-                triangle_nodes.add(n1)
-                # Add n2 to triangle_nodes
-                triangle_nodes.add(n2)
-        return triangle_nodes
-
-    # Print and write the assertion statement
-    print(nodes_in_triangle(wiki_graph, 'Andreas_Leigh_Aabel'))
-    assert len(nodes_in_triangle(wiki_graph, 'Andreas_Leigh_Aabel')) == 1
-
-    # Fnding open triangles. form the basis of friend recommendation systems;
-    # if "A" knows "B" and "A" knows "C", then it's probable that "B" also
-    # knows "C".
-    # Define node_in_open_triangle()
-    def node_in_open_triangle(G, n):
-        """
-        Checks whether pairs of neighbors of node `n` in graph `G` are in an
-        'open triangle' relationship with node `n`.
-        """
-        in_open_triangle = False
-        # Iterate over all possible triangle relationship combinations
-        for n1, n2 in combinations(G.neighbors(n), 2):
-            # Check if n1 and n2 do NOT have an edge between them
-            if not G.has_edge(n1, n2):
-                in_open_triangle = True
-                break
-        return in_open_triangle
-
-    # Compute the number of open triangles in T
-    num_open_triangles = 0
-    # Iterate over all the nodes in T
-    for n in wiki_graph.nodes():
-        # Check if the current node is in an open triangle
-        if node_in_open_triangle(wiki_graph, n):
-            # Increment num_open_triangles
-            num_open_triangles += 1
-    print(num_open_triangles)
-
-    # Finding maximal cliques
-    # Define maximal_cliques()
-    def maximal_cliques(G, size):
-        """
-        Finds all maximal cliques in graph `G` that are of size `size`.
-        """
-        mcs = []
-        for clique in nx.find_cliques(G):
-            if len(clique) == size:
-                mcs.append(clique)
-        return mcs
-
-    print(len(maximal_cliques(wiki_graph, 2)))  # 2658928
-    assert len(maximal_cliques(wiki_graph, 2)) == 2658928
-
-    subset = parsed_df.sample(n=1000)
-    subset_graph = nx.from_pandas_edgelist(df=subset,
-                                           source='Source',
-                                           target='Target',
-                                           edge_attr=True,
-                                           create_using=nx.Graph())
-    print(nx.info(subset_graph))
-    print(nx.draw(subset_graph))
-
-    # ======================================================================
-    # Subgraphs
-    # ======================================================================
-    # There may be times when you just want to analyze a subset of nodes
-    # in a network. To do so, you can copy them out into another graph
-    # object using G.subgraph(nodes), which returns a new graph object
-    # (of the same type as the original graph) that is comprised of the
-    # iterable of nodes that was passed in.
-    nodes_of_interest = [29, 38, 42]  # provided.
-
-    # Define get_nodes_and_nbrs()
-    def get_nodes_and_nbrs(G, nodes_of_interest):
-        """
-        Returns a subgraph of the graph `G` with only the `nodes_of_interest`
-        and their neighbors.
-        """
-        nodes_to_draw = []
-        # Iterate over the nodes of interest
-        for n in nodes_of_interest:
-            # Append the nodes of interest to nodes_to_draw
-            nodes_to_draw.append(n)
-            # Iterate over all the neighbors of node n
-            for nbr in G.neighbors(n):
-                # Append the neighbors of n to nodes_to_draw
-                nodes_to_draw.append(nbr)
-        return G.subgraph(nodes_to_draw)
-
-    # Extract the subgraph with the nodes of interest: T_draw
-    T_draw = get_nodes_and_nbrs(wiki_graph, ["'Nadine_Marshall'",
-                                             "'Park_Sang-myun'"])
-
-    # Draw the subgraph to the screen
-    nx.draw(T_draw)
-    plt.show()
-
-    # # Extract the nodes of interest: nodes
-    # nodes = [n for n, d in wiki_graph.nodes(data=True) if d['occupation'] == 'celebrity']
-    # # Create the set of nodes: nodeset
-    # nodeset = set(nodes)
-    #
-    # # Iterate over nodes
-    # for n in nodes:
-    #     # Compute the neighbors of n: nbrs
-    #     nbrs = T.neighbors(n)
-    #     # Compute the union of nodeset and nbrs: nodeset
-    #     nodeset = nodeset.union(nbrs)
-    #
-    # # Compute the subgraph using nodeset: T_sub
-    # T_sub = T.subgraph(nodeset)
-    #
-    # # Draw T_sub to the screen
-    # nx.draw(T_sub)
-    # plt.show()
-
-    print(nx.adjacency_matrix(subset_graph).todense())
-    print(pd.DataFrame(
-        nx.to_scipy_sparse_matrix(subset_graph)
-            .todense())
-          .to_csv('Sparse_Adjacency_Matrix.csv')
-          )
 
 
 
