@@ -56,6 +56,7 @@ def pandas_config():
 
 
 if __name__ == '__main__':
+
     # Reading in, inspecting, and plotting the graph
     pandas_config()
     parsed_df = pd.read_pickle('long_parsed_df_with_meta_data.pkl')
@@ -89,9 +90,6 @@ if __name__ == '__main__':
     # ======================================================================
     # Visualising
     # ======================================================================
-
-    # PLOT AGE AND DEGREE DISTRIBUTION
-
     # Create rationale plots
     # In an undirected graph, the matrix is symmetrical around the diagonal
     # as in this plot. Therefore, the data is read in correctly.
@@ -122,12 +120,13 @@ if __name__ == '__main__':
     print(degrees_series)
     print(degrees_series.sort_values(ascending=False))
 
-
-
-
-    # plt.figure()
-    # plt.hist(degrees, bins=100, range=[min(degrees), 75])
-    # plt.show()
+    # ======================================================================
+    # Betweeness centrality
+    # ======================================================================
+    # Compute the betweenness centrality of T: bet_cen
+    bet_cen = nx.betweenness_centrality(wiki_graph)
+    bet_cen_series = pd.Series(bet_cen, name='Betweeness_Centrality')
+    print(bet_cen_series.sort_values(ascending=False))
 
     # Plot a scatter plot of the centrality distribution and the degree
     # distribution
