@@ -55,6 +55,37 @@ def pandas_config():
 
 if __name__ == '__main__':
 
+    # ======================================================================
+    # Degree centrality
+    # ======================================================================
+    # Degree centrality. Who has the most neighbours compared to all possible
+    # neighbours in the dataset?
+    deg_cent = nx.degree_centrality(wiki_graph)
+    deg_cent_series = pd.Series(deg_cent, name='Degree_Centrality')
+    print(deg_cent_series)
+    print(deg_cent_series.sort_values(ascending=False))
+
+    # Plot a histogram of the degree distribution of the graph
+    # Compute the degree (n neighbours) of every node: degrees
+    degrees = [len(list(wiki_graph.neighbors(n))) for n in wiki_graph.nodes()]
+    degrees_series = pd.Series(degrees, name='Degrees')
+    print(degrees_series)
+    print(degrees_series.sort_values(ascending=False))
+
+    # ======================================================================
+    # Betweeness centrality
+    # ======================================================================
+    # Compute the betweenness centrality of T: bet_cen
+    bet_cen = nx.betweenness_centrality(wiki_graph)
+    bet_cen_series = pd.Series(bet_cen, name='Betweeness_Centrality')
+    print(bet_cen_series.sort_values(ascending=False))
+
+    # Plot a scatter plot of the centrality distribution and the degree
+    # distribution
+    plt.figure()
+    plt.scatter(degrees, list(deg_cent.values()))
+    plt.show()
+
     # Find the nodes that can broadcast messages very efficiently to lots of
     # people one degree of separation away.
     # Define find_nodes_with_highest_deg_cent()

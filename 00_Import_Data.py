@@ -116,7 +116,7 @@ if __name__ == '__main__':
     # Yes, this is true. If a value is None in either Month or Day
     # it is also None in the other.
 
-    # Now cleaning up this date dataframe into a usable metadata format.
+    # Now cleaning up this date dataframe into a usable format.
     date_df = (date_df
                .apply(lambda x: x.str.strip('['))  # Stripping lead chars
                .apply(lambda x: x.str.strip(']'))  # Stripping lag chars
@@ -163,10 +163,6 @@ if __name__ == '__main__':
     wide_link_df.insert(loc=0, column='ID', value=wide_link_df.index)
     print(wide_link_df['Year'].value_counts())
     print(wide_link_df.head())
-
-    # head_df = wide_link_df.head(20)
-    # print(head_df)
-    # print(pd.wide_to_long(head_df, stubnames='Link_', i='ID', j='Name'))
 
     # Converting from a wide to long dataframe
     long_parsed_df = (
