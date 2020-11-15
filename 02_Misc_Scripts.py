@@ -86,6 +86,22 @@ if __name__ == '__main__':
     plt.scatter(degrees, list(deg_cent.values()))
     plt.show()
 
+    # ======================================================================
+    # Visualising
+    # ======================================================================
+    # Create rationale plots
+    # In an undirected graph, the matrix is symmetrical around the diagonal
+    # as in this plot. Therefore, the data is read in correctly.
+    m = nv.MatrixPlot(wiki_graph)
+    m.draw()
+    plt.show()
+    c = nv.CircosPlot(wiki_graph)
+    c.draw()
+    plt.show()
+    a = nv.ArcPlot(wiki_graph)
+    a.draw()
+    plt.show()
+
     # Find the nodes that can broadcast messages very efficiently to lots of
     # people one degree of separation away.
     # Define find_nodes_with_highest_deg_cent()
