@@ -166,9 +166,20 @@ if __name__ == '__main__':
     print(final_dir_edge_df)
     print(final_dir_edge_df.shape)  # (523497, 2)
 
-    # =========================================================================
+    #                            Source                    Target
+    # 64           Joaqu%C3%ADn_Riascos             Santos_Acosta
+    # 171                  James_Masson  Benjamin_Allen_(Canad...
+    # 754                  Joanna_Baker    Orlando_Harrison_Baker
+    # 883                 Edward_Bausch         John_Jacob_Bausch
+    # 1326     Will_Taylor_(land_spe...            Jeremiah_Borst
+    #                            ...                       ...
+    # 4353737            Alisa_Sadikova              Ludvig_Nobel
+    # 4353754       Oksana_Selekhmeteva            Abigail_Forbes
+    # 4353772               Emma_Spence              Elvira_Saadi
+    # 4353776               Emma_Spence          No%C3%A9mi_Makra
+    # 4353857           Talisa_Torretti        Julieta_Cantaluppi
+
     # Sanity check on this stratifying strategy in networkx
-    # =========================================================================
     # Take the adjacency matrix in a scipy sparse/numpy format, subtract its
     # transpose, and mask the resultant matrix to get the absolute values.
     # This will return the directed edges which can be used to sanity check
@@ -233,6 +244,19 @@ if __name__ == '__main__':
     print(nodes_labels)
     print(nodes_labels.shape)
     print(nodes_labels['Nodes'].value_counts())
+
+    #                           Nodes  Cluster
+    # 0           Andreas_Leigh_Aabel        0
+    # 1                Anders_Krogvig        0
+    # 2       Benjamin_Vaughan_Abbott       12
+    # 3                 Austin_Abbott       12
+    # 4              Burroughs_Abbott       12
+    #                          ...      ...
+    # 841050           Vincent_Friell       12
+    # 841051          Tony_D%27Amario       12
+    # 841052            Michael_Neill       12
+    # 841053         Stephen_Ouimette       12
+    # 841054           Ruby_R._Levitt       12
 
     # Now I am creating a final df that contains the original edge list and now
     # has the the cluster labels merged in
@@ -335,6 +359,8 @@ if __name__ == '__main__':
                           .index)
                 .sample(10000, random_state=2)  # Sampling the df
                 .tolist())  # Getting the cluster names in a list
+
+    # [12179, 850, 12607, 331, 18257....
 
     # Extracting the 10,000 clusters from the full long edge list dataframe
     filt_df = full_long_df.loc[full_long_df['Cluster'].isin(clusters)]
@@ -494,8 +520,20 @@ if __name__ == '__main__':
 
     # What do the people in each cluster look like?
     print(filt_df['Cluster'].unique())  # Getting the individual cluster ints
-    print(filt_df['Cluster'].value_counts())  # Counting n user in each circle
-    print(filt_df.loc[filt_df['Cluster'] == 9645])  # Checking circle 5
+    print(filt_df['Cluster'].value_counts()[0:150])  # Counting users
+    # 3        46
+    # 9645     46
+    # 5434     43
+    # 10570    41
+    # 1210     39
+    #          ..
+    # 9725      2
+    # 17921     2
+    # 11788     2
+    # 15886     2
+    # 4098      2
+
+    print(filt_df.loc[filt_df['Cluster'] == 9645])  # Checking circle 9645
     print(filt_df.shape)
 
     #          Cluster                    Source                    Target
@@ -512,6 +550,29 @@ if __name__ == '__main__':
     # 4255760     9645            Yuval_Freilich                Noam_Mills
 
     # We can see that they are all European fencers
+
+    print(filt_df.loc[filt_df['Cluster'] == 1209])  # Checking circle 9645
+
+    #          Cluster              Source              Target
+    # 297584      1209         Rui_Yoshida       Ayomi_Yoshida
+    # 297590      1209       Ayomi_Yoshida     Chizuko_Yoshida
+    # 444540      1209     Hiroshi_Yoshida       Ayomi_Yoshida
+    # 612075      1209       Fujio_Yoshida  Georgia_O%27Keeffe
+    # 1108293     1209  T%C5%8Dshi_Yoshida     Hiroshi_Yoshida
+    # 1310178     1209        Kiso_Yoshida  T%C5%8Dshi_Yoshida
+    # 1470139     1209     Chizuko_Yoshida       Ayomi_Yoshida
+    # 1534541     1209      Hodaka_Yoshida       Ayomi_Yoshida
+    # 2497506     1209       Suezan_Aikins  T%C5%8Dshi_Yoshida
+    # 2724741     1209        Sarah_Brayer     Hiroshi_Yoshida
+
+    # All are japanese artists from the famous Yoshida family
+
+    # Exporting out this circle for visualisation with Gephi
+    yoshida_family_df = (filt_df.loc[filt_df['Cluster'] == 1209]
+                         .drop('Cluster', axis=1))
+
+    print(yoshida_family_df.shape)  # (10, 2)
+    yoshida_family_df.to_csv('yoshida_family_sub_graph_1.csv')
 
     # Now getting the long form df with these 10,000 circles and all of the
     # edges for each node.
@@ -538,10 +599,11 @@ if __name__ == '__main__':
     # John_Ronald_Lidster     1
     # Salvatore_Giardina      1
 
-    print(ten_k_circles_long_df.shape)  # (45955, 3)
-    ten_k_circles_long_df.to_csv('ten_k_circles_long_df.csv')
-    (ten_k_circles_long_df.drop('Cluster', axis=1)
-     .to_csv('ten_k_circles_long_df.csv'))
+    yoshida_family_df = (filt_df.loc[filt_df['Cluster'] == 1209]
+                         .drop('Cluster', axis=1))
+
+    print(yoshida_family_df.shape)  # (10, 2)
+    yoshida_family_df.to_csv('yoshida_family_sub_graph_1.csv')
 
     # =========================================================================
     # Now running the clustering for question two on the directed graph
@@ -561,9 +623,11 @@ if __name__ == '__main__':
     total = t1 - t0
     print(total)
 
+    # Getting the cluster labels
     unique_labels, counts = np.unique(labels, return_counts=True)
     print(unique_labels, counts)
 
+    # Getting the modularity
     modularity(dir_adjacency, labels)  # 0.4943768068371678
     # Much better modularity
 
@@ -575,6 +639,7 @@ if __name__ == '__main__':
     print(clust_labels)
     print(nodes_labels)
 
+    # Creating a final long form df of the cluster labels and edges
     final_df = (pd.merge(left=nodes_labels,
                          right=parsed_df,
                          left_on='Nodes',
@@ -596,7 +661,7 @@ if __name__ == '__main__':
     # Hsi_Tseng_Tsiang       1
     # Hans_Lampe             1
 
-    final_df.to_csv('undirected_clust_df_test.csv')
+    final_df.to_csv('directed_clust_df_test.csv')
 
     #          Cluster                    Source                    Target
     # 0              0      Joaqu%C3%ADn_Riascos             Santos_Acosta
@@ -617,10 +682,16 @@ if __name__ == '__main__':
     final_df = (final_df
                 .loc[final_df['Source']
                      .duplicated(keep='first') == False])
-    print(final_df.shape)
+    print(final_df.shape)  # (445139, 3)
 
     # =========================================================================
+    # 1000 circle selection
+    # =========================================================================
 
+    # Now that we do not need to worry about tight connections and just
+    # introduce as many people as we can to circles, let's run the sub-sampling
+    # strategy again and get sub graphs of 1000 circles with different
+    # numbers of users.
     seed_n_list = []
     n_users_list = []
     n_circles_list = []
@@ -667,7 +738,7 @@ if __name__ == '__main__':
     # 3      4     2057       1000
     # 0      1     2014       1000
 
-    # For now, let's just take the 10,000 circles with the max number of users,
+    # For now, let's just take the 1000 circles with the max number of users,
     # This corresponds to a seed = 3.
     dir_clusters = (pd.Series(final_df['Cluster']
                               .value_counts()
@@ -675,7 +746,7 @@ if __name__ == '__main__':
                     .sample(1000, random_state=3)  # Sampling the df
                     .tolist())  # Getting the cluster names in a list
 
-    # Extracting the 10,000 clusters from the full long edge list dataframe
+    # Extracting the 1000 clusters from the full long edge list dataframe
     filt_df = full_long_df.loc[full_long_df['Cluster'].isin(dir_clusters)]
     print(filt_df.shape)  # (12987, 3)
     print(filt_df['Cluster'].value_counts().shape)  # (1000,)
